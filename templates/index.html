@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<title>AP-Crawler Tracker input</title>
+{% endblock %}
+
+{% block body %}
+
+<div class="inputform">
+    <table>
+        <tr>
+            <th>Actions</th>
+        </tr>
+        <tr>
+            <td>
+                <form action="/webinput/?row_update=true&increment=1" method="POST">
+                    <input type="submit" value="Add Row (+)">
+                </form>
+            </td>
+            <td>
+                <form action="/webinput/?row_update=true&increment=-1" method="POST">
+                    <input type="submit" value="Remove Row (-)">
+                </form>
+            </td>
+        </tr>
+    </table>
+    <form action="/webinput/" method="POST" name="tracker_url_list">
+        <table>
+            <tr>
+                <td>
+                    <label>
+                        <input type="submit" name="add_links" value="Add link(s) to database">
+                    </label>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <label>
+                        <input type="submit" name="create_dashboard" value="Submit and create dashboard">
+                    </label>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <label>
+                        <input type="submit" name="delete_old_dashboard" value="Delete old dashboard">
+                    </label>
+                </td>
+            </tr>
+            <tr>
+                <th>Link</th>
+            </tr>
+            {% for row in rows %}
+            <tr>
+                <td>
+                    <input type="text" name="tracker_urls" id="tracker_link" value="{{ tracker_url }}">
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </form>
+</div>
+
+{% if added_links_list|length > 0 %}
+<div class="recently added links">
+    <table>
+        <tr>
+            <th>Added Links</th>
+        </tr>
+        {% for link in added_links_list %}
+        <tr>
+            <td>{{ link }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+{% if invalid_links_list|length > 0 %}
+<div class="recently added links">
+    <table>
+        <tr>
+            <th>Added Links</th>
+        </tr>
+        {% for invalid_link in invalid_links_list %}
+        <tr>
+            <td>{{ invalid_link }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+<div class="clear_all">
+    <form action="/webinput/clear" method="POST">
+        <input type="submit" value="clear all">
+    </form>
+</div>
+
+{% if dashboard_link|length > 1 %}
+<div class="recently added links">
+    <table>
+        <tr>
+            <th>Dashboard Links</th>
+        </tr>
+        <tr>
+            <td><a href="{{dashboard_link}}">{{ dashboard_link }}</a></td>
+        </tr>
+    </table>
+</div>
+{% endif %}
+
+{% endblock %}
