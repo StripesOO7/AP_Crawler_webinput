@@ -168,15 +168,15 @@ def build_target(letter_index, query, url_list):
 # this si just to have the querys in one place and to just interate over it to create all panels in a row
 panel_order = [
   (1, """SELECT name, timestamp as time, checks_done from Stats_Total WHERE name = 'Total' AND url = 
-  {} ORDER BY timestamp ASC;""", "AP total checks done"),
+  {} ORDER BY timestamp;""", "AP total checks done"),
   (2, """SELECT games_done, timestamp as time from Stats_total WHERE url = ( SELECT url from Trackers WHERE url LIKE 
-  {} and COALESCE(finished, '') = '' ) ORDER BY timestamp ASC;""", "AP total games finished"),
-  (3, """SELECT url name, timestamp as time, percentage from Stats_total WHERE name = 'Total' AND url = {} ORDER BY timestamp ASC;""",
+  {} and COALESCE(finished, '') = '' ) ORDER BY timestamp;""", "AP total games finished"),
+  (3, """SELECT url name, timestamp as time, percentage from Stats_total WHERE name = 'Total' AND url = {} ORDER BY timestamp;""",
    "AP total percentage"),
   (4, """SELECT name, timestamp as time, checks_done from Stats  WHERE not name = 'Total' AND url IN ( {} ) ORDER BY 
-  timestamp ASC;""", "Per Player Stats (actual numbers)"),
+  timestamp;""", "Per Player Stats (actual numbers)"),
   (5, """SELECT name, timestamp as time, percentage from Stats WHERE not name = 'Total' AND url IN ( {} ) ORDER BY 
-  timestamp ASC;""", "Per Player Percentage done"),
+  timestamp;""", "Per Player Percentage done"),
 ]
 
 
