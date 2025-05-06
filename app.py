@@ -167,11 +167,11 @@ def build_target(letter_index, query, url_list):
 
 # this si just to have the querys in one place and to just interate over it to create all panels in a row
 panel_order = [
-  (1, """SELECT name, timestamp, checks_done from Stats_Total WHERE name = 'Total' AND url = 
-  {};""", "AP total checks done"),
+  (1, """SELECT name, timestamp as time, checks_done from Stats_Total WHERE name = 'Total' AND url = 
+  {} ORDER BY timestamp ASC;""", "AP total checks done"),
   (2, """SELECT games_done, timestamp as time from Stats_total WHERE url = ( SELECT url from Trackers WHERE url LIKE 
   {} and COALESCE(finished, '') = '' ) ORDER BY timestamp ASC;""", "AP total games finished"),
-  (3, """SELECT url name, timestamp, percentage from Stats_total WHERE name = 'Total' AND url = {};""",
+  (3, """SELECT url name, timestamp as time, percentage from Stats_total WHERE name = 'Total' AND url = {} ORDER BY timestamp ASC;""",
    "AP total percentage"),
   (4, """SELECT name, timestamp as time, checks_done from Stats  WHERE not name = 'Total' AND url IN ( {} ) ORDER BY 
   timestamp ASC;""", "Per Player Stats (actual numbers)"),
@@ -231,7 +231,7 @@ def create_dashboard_template(url_list):
     shared_dashboard_accesstoken = share_dashboard.json()['accessToken']
 
     # print(f"accesstoken: + {shared_dashboard_accesstoken}")
-    public_url = f"https://<YOUR_URL/URI>/public-dashboards/{shared_dashboard_accesstoken}"
+    public_url = f"https://{BASE_URL}/public-dashboards/{shared_dashboard_accesstoken}"
     return public_url
 
 def delete_dashboard(url:str):
@@ -269,7 +269,7 @@ def index():
     if request.method == 'POST':
         create_dashboard = request.form.get('create_dashboard')
         add_links = request.form.get('add_links')
-        user_input = request.form.getlist('tracker_urls')
+        user_input = set(request.form.getlist('tracker_urls'))
         delete_dashboard_link = request.form.get('delete_old_dashboard')
 
         # with open(r'~/Grafana/AP-Crawler/new_trackers.txt', 'a') as new_tracker_file:
