@@ -105,8 +105,7 @@ def panel_template():
                 "mode": "absolute",
                 "steps": [
                     {
-                        "color": "green",
-                        "value": None
+                        "color": "green"
                     },
                     {
                         "color": "red",
@@ -121,7 +120,7 @@ def panel_template():
         "h": 24,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 0
     },
     "id": 0,
     "options": {
@@ -207,6 +206,8 @@ def create_dashboard_template(url_list):
         ### create panel templates with each query. if multiple links get submitted via the webinput form all links
         ### will be used applied to all dashoboard. so it's a comparison/all in one view
         tmp_panel = panel_template()
+        tmp_panel["id"] = panel_index
+        tmp_panel["gridPos"]["y"] = (panel_index - 1) * 24
         if panel_index < 4:
             for url_index, url in enumerate(url_list):
                 tmp_panel["targets"].append(build_target(url_index, SQL_query, [url]))
