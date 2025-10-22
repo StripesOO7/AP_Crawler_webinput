@@ -211,10 +211,6 @@ def table_panel_template():
 
 def build_target(letter_index, query, url_list):
     query = query.replace('\n', '')
-    if letter_index == 1:
-        chart_format = "table"
-    else:
-        chart_format = "time_series"
     if len(url_list) > 1:
         urls = f"""'{"','".join(url_list)}'"""
     else:
@@ -225,7 +221,7 @@ def build_target(letter_index, query, url_list):
             "uid": "fedh76gb5ds00c"
         },
         "editorMode": "code",
-        "format": f"{chart_format}",
+        "format": "time_series",
         "rawQuery": True,
         "rawSql": f"""{query.format(urls)}""",
         "refId": f"{ascii_uppercase[letter_index]}",
@@ -297,6 +293,8 @@ def create_dashboard_template(url_list):
                 tmp_panel["targets"].append(build_target(url_index, SQL_query, [url]))
         else:
             tmp_panel["targets"].append(build_target(panel_index, SQL_query, url_list))
+        if panel_index == 1:
+            tmp_panel["targets"][0]["format"] = "table"
         tmp_panel["title"] = name
         dashboard["panels"].append(tmp_panel)
     data_json["dashboard"] = dashboard
