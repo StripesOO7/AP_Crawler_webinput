@@ -54,7 +54,7 @@ def dashboard_template():
   "weekStart": ""
   }
 
-def panel_template():
+def line_panel_template():
     ### this is a just the json template from my panels. it will create simple line-graphs with predefined querys
   return {
     "datasource": {
@@ -145,8 +145,76 @@ def panel_template():
 }
 
 
+def table_panel_template():
+    ### this is a just the json template from my panels. it will create simple line-graphs with predefined querys
+  return {
+    "datasource": {
+        "type": "grafana-postgresql-datasource",
+        ### change to your desired datasource but since the crawler saves to Postgres DB this is the default
+        "uid": "fedh76gb5ds00c" # uid of the datasource
+    },
+    "fieldConfig": {
+        "defaults": {
+            "color": {
+                "mode": "palette-classic"
+            },
+            "custom": {
+                "align": "auto",
+                "cellOptions": {
+                    "type": "auto"
+                },
+                "inspect": False
+            },
+            "mappings": [],
+            "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                    {
+                        "color": "green",
+                        "value": 0
+                    },
+                    {
+                        "color": "red",
+                        "value": 80
+                    }
+                ]
+          }
+        },
+        "overrides": []
+    },
+    "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+    },
+    "id": 0,
+    "options": {
+        "cellHeight": "sm",
+        "footer": {
+            "countRows": False,
+            "fields": "",
+            "reducer": [
+                "sum"
+            ],
+            "show": False
+        },
+        "showHeader": True
+      },
+    "pluginVersion": "11.5.1",
+    "targets": [
+    ],
+    "title": "Base Stats",
+    "type": "table"
+}
+
+
 def build_target(letter_index, query, url_list):
     query = query.replace('\n', '')
+    if letter_index == 1:
+        chart_format = "table"
+    else:
+        chart_format = "time_series"
     if len(url_list) > 1:
         urls = f"""'{"','".join(url_list)}'"""
     else:
@@ -157,7 +225,7 @@ def build_target(letter_index, query, url_list):
             "uid": "fedh76gb5ds00c"
         },
         "editorMode": "code",
-        "format": "time_series",
+        "format": f"{chart_format}",
         "rawQuery": True,
         "rawSql": f"""{query.format(urls)}""",
         "refId": f"{ascii_uppercase[letter_index]}",
@@ -166,16 +234,28 @@ def build_target(letter_index, query, url_list):
 
 # this si just to have the querys in one place and to just interate over it to create all panels in a row
 panel_order = [
-  (1, """SELECT name, timestamp as time, checks_done from Stats_Total WHERE name = 'Total' AND url = 
-  {} ORDER BY timestamp;""", "AP total checks done"),
-  (2, """SELECT games_done, timestamp as time from Stats_total WHERE url = ( SELECT url from Trackers WHERE url LIKE 
-  {} and COALESCE(finished, '') = '' ) ORDER BY timestamp;""", "AP total games finished"),
-  (3, """SELECT url name, timestamp as time, percentage from Stats_total WHERE name = 'Total' AND url = {} ORDER BY timestamp;""",
-   "AP total percentage"),
-  (4, """SELECT name, timestamp as time, checks_done from Stats  WHERE not name = 'Total' AND url IN ( {} ) ORDER BY 
-  timestamp;""", "Per Player Stats (actual numbers)"),
-  (5, """SELECT name, timestamp as time, percentage from Stats WHERE not name = 'Total' AND url IN ( {} ) ORDER BY 
-  timestamp;""", "Per Player Percentage done"),
+    (1,"SELECT\r\n  title as Title,\r\n  MAX(Timestamp)-MIN(timestamp) AS Duration,\r\n  MIN(timestamp) as Startdate,"
+       "\r\n  MAX(Timestamp) as Enddate,\r\n  url as URL,\r\n  MAX(base.checks_done) as checks_done,"
+       "\r\n  checks_total,\r\n  MAX(base.checks_done)/(Extract( EPOCH from MAX(Timestamp) - MIN(timestamp))/60) as "
+       "Checks_per_Minute,\r\n  MAX(base.checks_done)/(Extract( EPOCH from MAX(Timestamp) - MIN(timestamp))/(60*60)) "
+       "as Checks_per_Hour,\r\n  MAX(base.checks_done)/(Extract( EPOCH from MAX(Timestamp) - MIN(timestamp))/("
+       "60*60*24))  as Checks_per_Day\r\nFROM\r\n  (\r\n    SELECT\r\n      stats_total.*,\r\n      "
+       "trackers.title\r\n    FROM\r\n      stats_total,\r\n      trackers\r\n    Where\r\n      trackers.url in ("
+       "\r\n        SELECT\r\n          URL\r\n        from\r\n          trackers\r\n        WHERE\r\n          url = {}"
+       "\r\n      )\r\n      AND trackers.url = stats_total.url\r\n  ) as base\r\nGROUP BY\r\n  url,\r\n  title,"
+       "\r\n  checks_total", "Base Stats"),
+    (2, """SELECT name, timestamp as time, checks_done from Stats_Total WHERE name = 'Total' AND url = 
+    {} ORDER BY timestamp;""", "AP total checks done"),
+    (3, """SELECT games_done, timestamp as time from Stats_total WHERE url = ( SELECT url from Trackers WHERE url LIKE 
+  {} and COALESCE(finished, '') = '' ) ORDER BY timestamp;""", "AP total games"
+                                                                                                      " finished"),
+    (4, """SELECT url name, timestamp as time, percentage from Stats_total WHERE name = 'Total' AND url = {} ORDER BY 
+    timestamp;""",
+    "AP total percentage"),
+    (5, """SELECT name, timestamp as time, checks_done from Stats  WHERE not name = 'Total' AND url IN ( {} ) ORDER BY 
+    timestamp;""", "Per Player Stats (actual numbers)"),
+    (6, """SELECT name, timestamp as time, percentage from Stats WHERE not name = 'Total' AND url IN ( {} ) ORDER BY 
+    timestamp;""", "Per Player Percentage done"),
 ]
 
 
@@ -205,10 +285,14 @@ def create_dashboard_template(url_list):
     for panel_index, SQL_query, name in panel_order:
         ### create panel templates with each query. if multiple links get submitted via the webinput form all links
         ### will be used applied to all dashoboard. so it's a comparison/all in one view
-        tmp_panel = panel_template()
+        if panel_index > 1:
+            tmp_panel = line_panel_template()
+            tmp_panel["gridPos"]["y"] = (panel_index - 1) * 24 + 8
+        else:
+            tmp_panel = table_panel_template()
+            tmp_panel["gridPos"]["y"] = 0
         tmp_panel["id"] = panel_index
-        tmp_panel["gridPos"]["y"] = (panel_index - 1) * 24
-        if panel_index < 4:
+        if panel_index < 5:
             for url_index, url in enumerate(url_list):
                 tmp_panel["targets"].append(build_target(url_index, SQL_query, [url]))
         else:
