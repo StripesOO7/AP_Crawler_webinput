@@ -116,9 +116,10 @@
         <tr>
             <th>Old Dashboards</th>
         </tr>
-        {% for dashboard in old_dashboards %}
+        {% for dashboard, date in old_dashboards %}
         <tr>
             <td><a href="{{dashboard}}">{{ dashboard }}</a></td>
+            <td>Created at: {{ date }}</td>
         </tr>
         {% endfor %}
     </table>
