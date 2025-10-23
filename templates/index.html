@@ -110,4 +110,19 @@
 </div>
 {% endif %}
 
+{% if old_dashboards|length > 0 %}
+<div class="recently added links">
+    <table>
+        <tr>
+            <th>Old Dashboards</th>
+        </tr>
+        {% for dashboard in old_dashboards %}
+        <tr>
+            <td><a href="{{dashboard}}">{{ dashboard }}</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
 {% endblock %}

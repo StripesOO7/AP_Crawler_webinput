@@ -1,11 +1,12 @@
 from datetime import datetime
 from string import ascii_uppercase
 import requests as rq
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, make_response
 from bs4 import BeautifulSoup as bs, element
 
 app = Flask(__name__)
 app.secret_key = '<BAD_SECRET_KEY>'
+app.config['SESSION_COOKIE_NAME'] = 'AP_Dashboard_Webinput'
 ### Your secret key as string here. needed for https
 
 BASE_URL = "<YOURBASE URL>" ### YOUR Base ULR/URI without "http(s)://"
@@ -243,11 +244,9 @@ panel_order = [
     (2, """SELECT name, timestamp as time, checks_done from Stats_Total WHERE name = 'Total' AND url = 
     {} ORDER BY timestamp;""", "AP total checks done"),
     (3, """SELECT games_done, timestamp as time from Stats_total WHERE url = ( SELECT url from Trackers WHERE url LIKE 
-  {} and COALESCE(finished, '') = '' ) ORDER BY timestamp;""", "AP total games"
-                                                                                                      " finished"),
+    {} ) ORDER BY timestamp;""", "AP total games finished"),
     (4, """SELECT url name, timestamp as time, percentage from Stats_total WHERE name = 'Total' AND url = {} ORDER BY 
-    timestamp;""",
-    "AP total percentage"),
+    timestamp;""", "AP total percentage"),
     (5, """SELECT name, timestamp as time, checks_done from Stats  WHERE not name = 'Total' AND url IN ( {} ) ORDER BY 
     timestamp;""", "Per Player Stats (actual numbers)"),
     (6, """SELECT name, timestamp as time, percentage from Stats WHERE not name = 'Total' AND url IN ( {} ) ORDER BY 
@@ -336,9 +335,11 @@ def delete_dashboard(url:str):
 
 @app.route("/webinput/", methods=['GET', 'POST', 'UPDATE'])
 def index():
+    cookie_set = request.cookies.get('old_dashboards') or ""
     dashboard_link = ""
     added_list = list()
     invalid_links = list()
+
     if request.args.get('row_update'):
         increment = int(request.args.get('increment'))
         if session['rows'] + increment > 0:
@@ -378,14 +379,22 @@ def index():
                     pass
         if create_dashboard:
             dashboard_link = create_dashboard_template(added_list)
+            if dashboard_link not in cookie_set:
+                cookie_set = ";;".join([*cookie_set.split(";;"), dashboard_link])
         if delete_dashboard_link:
             for link in user_input:
                 if f'{BASE_URL}/public-dashboards/' in link:
+                    cookie_set = cookie_set.replace(f";;{link}'", "")
                     delete_dashboard(link)
-
-
-    return render_template('index.html', rows=range(session['rows']), added_links_list=added_list,
-                           invalid_links_list=invalid_links, dashboard_link=dashboard_link)
+    old_dashboards = cookie_set.split(';;')[1:] or list()
+    response = make_response(render_template('index.html', rows=range(session['rows']), added_links_list=added_list,
+                                             invalid_links_list=invalid_links, dashboard_link=dashboard_link,
+                                             old_dashboards=old_dashboards))
+    if not cookie_set:
+        response.set_cookie('old_dashboards', "")
+    else:
+        response.set_cookie('old_dashboards', cookie_set)
+    return response
     # else:
     #     return render_template('index.html', rows=range(session['rows']))
 
@@ -393,7 +402,7 @@ def index():
 @app.route("/webinput/clear/", methods=['GET', 'POST'])
 def clear():
     session.clear()
-    return redirect(url_for('index'))
+    return make_response(redirect(url_for('index')))
 
 
 if __name__ == "__main__":
