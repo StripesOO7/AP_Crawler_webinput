@@ -254,7 +254,7 @@ panel_order = [
 ]
 
 
-def create_dashboard_template(url_list):
+def create_dashboard_template(url_list, title):
     base_url=f"https://{BASE_URL}/api/"
     ### /api/ is needed to interact with the api endpoints
     header_json = {
@@ -297,8 +297,8 @@ def create_dashboard_template(url_list):
         tmp_panel["title"] = name
         dashboard["panels"].append(tmp_panel)
     data_json["dashboard"] = dashboard
-    data_json["title"] = f"(A)Sync from {datetime.today().strftime('%Y-%m-%d')}"
-    data_json["dashboard"]["title"] = f"(A)Sync from {datetime.today().strftime('%Y-%m-%d')}"
+    data_json["title"] = f"{title}" if len(title)>0 else f"(A)Sync from {datetime.today().strftime('%Y-%m-%d')}"
+    data_json["dashboard"]["title"] = f"{title}" if len(title)>0 else f"(A)Sync from {datetime.today().strftime('%Y-%m-%d')}"
     # print(json.dumps(header_json))
     # print(json.dumps(data_json))
 
@@ -340,6 +340,7 @@ def index():
     dashboard_link = ""
     added_list = list()
     invalid_links = list()
+    title = ""
 
     if request.args.get('row_update'):
         increment = int(request.args.get('increment'))
@@ -356,6 +357,7 @@ def index():
         add_links = request.form.get('add_links')
         user_input = set(request.form.getlist('tracker_urls'))
         delete_dashboard_link = request.form.get('delete_old_dashboard')
+        title = request.form.get('title')
 
         # with open(r'~/Grafana/AP-Crawler/new_trackers.txt', 'a') as new_tracker_file:
         with open(r'H:\AP-crawler/new_trackers.txt', 'a') as new_tracker_file:
@@ -379,7 +381,7 @@ def index():
                 except:
                     pass
         if create_dashboard:
-            dashboard_link = create_dashboard_template(added_list)
+            dashboard_link = create_dashboard_template(added_list, title)
             if dashboard_link not in cookie_links:
                 cookie_links = ";;".join([*cookie_links.split(";;"), dashboard_link])
                 cookie_dates = ";;".join([*cookie_dates.split(";;"), str(datetime.now())])
