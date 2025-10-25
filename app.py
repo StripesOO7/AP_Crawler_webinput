@@ -337,6 +337,7 @@ def delete_dashboard(url:str):
 def index():
     cookie_links = request.cookies.get('old_dashboards_links') or ""
     cookie_dates = request.cookies.get('old_dashboards_dates') or ""
+    cookie_titles = request.cookies.get('old_dashboards_titles') or ""
     dashboard_link = ""
     added_list = list()
     invalid_links = list()
@@ -385,27 +386,35 @@ def index():
             if dashboard_link not in cookie_links:
                 cookie_links = ";;".join([*cookie_links.split(";;"), dashboard_link])
                 cookie_dates = ";;".join([*cookie_dates.split(";;"), str(datetime.now())])
+                cookie_titles = ";;".join([*cookie_titles.split(";;"), title])
         if delete_dashboard_link:
             for link in user_input:
                 if f'{BASE_URL}/public-dashboards/' in link:
                     position_finder = cookie_links.split(";;")
+
                     remove_cookie_date = cookie_dates.split(";;")
                     remove_cookie_date.pop(position_finder.index(link))
+                    remove_cookie_title = cookie_titles.split(";;")
+                    remove_cookie_title.pop(position_finder.index(link))
 
                     cookie_links = cookie_links.replace(f"\073\073{link}", "")
                     cookie_dates = ";;".join(remove_cookie_date)
+                    cookie_titles = ";;".join(remove_cookie_title)
                     delete_dashboard(link)
     old_dashboards = cookie_links.split(';;')[1:] or list()
     creation_dates = cookie_dates.split(';;')[1:] or list()
+    old_dashboard_titles = cookie_titles.split(';;')[1:] or list()
     response = make_response(render_template('index.html', rows=range(session['rows']), added_links_list=added_list,
                                              invalid_links_list=invalid_links, dashboard_link=dashboard_link,
-                                             old_dashboards=list(zip(old_dashboards, creation_dates))))
+                                             old_dashboards=list(zip(old_dashboards, creation_dates, old_dashboard_titles))))
     if not cookie_links:
         response.set_cookie('old_dashboards_links', "")
         response.set_cookie('old_dashboards_dates', "")
+        response.set_cookie('old_dashboards_titles', "")
     else:
         response.set_cookie('old_dashboards_links', cookie_links)
         response.set_cookie('old_dashboards_dates', cookie_dates)
+        response.set_cookie('old_dashboards_titles', cookie_titles)
     return response
     # else:
     #     return render_template('index.html', rows=range(session['rows']))
