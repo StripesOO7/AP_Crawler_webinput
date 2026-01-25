@@ -44,7 +44,7 @@ def dashboard_template():
       "list": []
   },
   "time": {
-      "from": "now-3h",
+      "from": f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
       "to": "now"
   },
   "timepicker": {},
@@ -254,7 +254,7 @@ panel_order = [
 ]
 
 
-def create_dashboard_template(url_list, title):
+def create_dashboard_template(url_list, title, max_games):
     base_url=f"https://{BASE_URL}/api/"
     ### /api/ is needed to interact with the api endpoints
     header_json = {
@@ -292,8 +292,17 @@ def create_dashboard_template(url_list, title):
                 tmp_panel["targets"].append(build_target(url_index, SQL_query, [url]))
         else:
             tmp_panel["targets"].append(build_target(panel_index, SQL_query, url_list))
+        print(tmp_panel)
         if panel_index == 1:
             tmp_panel["targets"][0]["format"] = "table"
+        if panel_index == 3:
+            tmp_panel["fieldConfig"]["defaults"]["max"] = max_games
+            tmp_panel["fieldConfig"]["defaults"]["min"] = 0
+        if panel_index in [4, 6]:
+            tmp_panel["fieldConfig"]["defaults"]["max"] = 100
+            tmp_panel["fieldConfig"]["defaults"]["min"] = 0
+            tmp_panel["fieldConfig"]["defaults"]["unit"] = "percent"
+            tmp_panel["fieldConfig"]["defaults"]["decimals"] = 2
         tmp_panel["title"] = name
         dashboard["panels"].append(tmp_panel)
     data_json["dashboard"] = dashboard
@@ -342,7 +351,6 @@ def index():
     added_list = list()
     invalid_links = list()
     title = ""
-
     if request.args.get('row_update'):
         increment = int(request.args.get('increment'))
         if session['rows'] + increment > 0:
@@ -360,9 +368,10 @@ def index():
         delete_dashboard_link = request.form.get('delete_old_dashboard')
         title = request.form.get('title')
 
-        # with open(r'~/Grafana/AP-Crawler/new_trackers.txt', 'a') as new_tracker_file:
-        with open(r'H:\AP-crawler/new_trackers.txt', 'a') as new_tracker_file:
+        with open(r'/home/stripes/Grafana/AP-Crawler/new_trackers.txt', 'a') as new_tracker_file:
+        # with open(r'H:\AP-crawler/new_trackers.txt', 'a') as new_tracker_file:
             ### the main AP-Crawler script uses this textfile so i also just append it here
+            total_games = 0
             for link in user_input:
                 try:
                     if any(word in link for word in ['/tracker/', '/room/']):
@@ -372,6 +381,14 @@ def index():
                             room_html = bs(room_page.text, 'html.parser')
                             room_info = room_html.find("span", id="host-room-info").contents
                             link = f"{link.split('/room/')[0]}{room_info[1].get('href')}"
+                        tracker_page = rq.get(url=link)
+                        tracker_html = bs(tracker_page.text, 'html.parser')
+                        tmp = [0]
+                        for total_data in tracker_html.find('tfoot').contents[1].contents:
+                            if isinstance(total_data, element.Tag):
+                                tmp.append(total_data.get_text(strip=True))
+                        total_check = tmp[3].split(' ')[0].split('/')
+                        total_games = int(total_check[1])
                         new_tracker_file.writelines(link + '\n')
                         session['rows'] = 1
                         added_list.append(link)
@@ -380,9 +397,10 @@ def index():
                         invalid_links.append(link)
                         # pass
                 except:
+                    print("ERROR!!!!!!!!!!!!!!!")
                     pass
         if create_dashboard:
-            dashboard_link = create_dashboard_template(added_list, title)
+            dashboard_link = create_dashboard_template(added_list, title, total_games)
             if dashboard_link not in cookie_links:
                 cookie_links = ";;".join([*cookie_links.split(";;"), dashboard_link])
                 cookie_dates = ";;".join([*cookie_dates.split(";;"), str(datetime.now())])
