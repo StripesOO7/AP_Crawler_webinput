@@ -3,14 +3,17 @@ from string import ascii_uppercase
 import requests as rq
 from flask import Flask, render_template, request, redirect, url_for, session, make_response
 from bs4 import BeautifulSoup as bs, element
+from os import getenv
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = '<BAD_SECRET_KEY>'
-app.config['SESSION_COOKIE_NAME'] = 'AP_Dashboard_Webinput'
+app.secret_key = getenv('SECRET_KEY')
+app.config['SESSION_COOKIE_NAME'] = getenv('SESSION_COOKIE_NAME')
 ### Your secret key as string here. needed for https
-
-BASE_URL = "<YOURBASE URL>" ### YOUR Base ULR/URI without "http(s)://"
-GRAFANA_TOKEN = "<YOUR ACCESS TOKEN>" ### generated in your admin settings under "/org/serviceaccounts"
+BASE_URL = getenv('BASE_URL') ### YOUR Base ULR/URI without "http(s)://"
+GRAFANA_TOKEN = getenv('GRAFANA_TOKEN') ### generated in your admin settings under "/org/serviceaccounts"
 def dashboard_template():
   return {
   "annotations": {
@@ -289,11 +292,12 @@ def create_dashboard_template(url_list, title, max_games):
         tmp_panel["id"] = panel_index
         if panel_index < 5:
             for url_index, url in enumerate(url_list):
-                tmp_panel["targets"].append(build_target(url_index, SQL_query, [url]))
+                tmp_panel["targets"].append(build_target(panel_index, SQL_query, [url]))
         else:
             tmp_panel["targets"].append(build_target(panel_index, SQL_query, url_list))
         print(tmp_panel)
         if panel_index == 1:
+            tmp_panel["targets"].append(dict())
             tmp_panel["targets"][0]["format"] = "table"
         if panel_index == 3:
             tmp_panel["fieldConfig"]["defaults"]["max"] = max_games
@@ -344,9 +348,9 @@ def delete_dashboard(url:str):
 
 @app.route("/webinput/", methods=['GET', 'POST', 'UPDATE'])
 def index():
-    cookie_links = request.cookies.get('old_dashboards_links') or ""
-    cookie_dates = request.cookies.get('old_dashboards_dates') or ""
-    cookie_titles = request.cookies.get('old_dashboards_titles') or ""
+    cookie_links = request.cookies.get('dashboard_links') or ""
+    cookie_dates = request.cookies.get('dashboard_dates') or ""
+    cookie_titles = request.cookies.get('dashboard_titles') or ""
     dashboard_link = ""
     added_list = list()
     invalid_links = list()
@@ -368,7 +372,7 @@ def index():
         delete_dashboard_link = request.form.get('delete_old_dashboard')
         title = request.form.get('title')
 
-        with open(r'/home/stripes/Grafana/AP-Crawler/new_trackers.txt', 'a') as new_tracker_file:
+        with open(fr'{getenv("NEW_TRACKER_FILEPATH")}', 'a') as new_tracker_file:
         # with open(r'H:\AP-crawler/new_trackers.txt', 'a') as new_tracker_file:
             ### the main AP-Crawler script uses this textfile so i also just append it here
             total_games = 0
@@ -426,13 +430,13 @@ def index():
                                              invalid_links_list=invalid_links, dashboard_link=dashboard_link,
                                              old_dashboards=list(zip(old_dashboards, creation_dates, old_dashboard_titles))))
     if not cookie_links:
-        response.set_cookie('old_dashboards_links', "")
-        response.set_cookie('old_dashboards_dates', "")
-        response.set_cookie('old_dashboards_titles', "")
+        response.set_cookie('dashboard_links', "")
+        response.set_cookie('dashboard_dates', "")
+        response.set_cookie('dashboard_titles', "")
     else:
-        response.set_cookie('old_dashboards_links', cookie_links)
-        response.set_cookie('old_dashboards_dates', cookie_dates)
-        response.set_cookie('old_dashboards_titles', cookie_titles)
+        response.set_cookie('dashboard_links', cookie_links)
+        response.set_cookie('dashboard_dates', cookie_dates)
+        response.set_cookie('dashboard_titles', cookie_titles)
     return response
     # else:
     #     return render_template('index.html', rows=range(session['rows']))
