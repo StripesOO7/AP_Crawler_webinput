@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from string import ascii_uppercase
 import requests as rq
 from flask import Flask, render_template, request, redirect, url_for, session, make_response
@@ -430,13 +430,13 @@ def index():
                                              invalid_links_list=invalid_links, dashboard_link=dashboard_link,
                                              old_dashboards=list(zip(old_dashboards, creation_dates, old_dashboard_titles))))
     if not cookie_links:
-        response.set_cookie('dashboard_links', "")
-        response.set_cookie('dashboard_dates', "")
-        response.set_cookie('dashboard_titles', "")
+        response.set_cookie('dashboard_links', "", expires=datetime.now() + timedelta(days=30))
+        response.set_cookie('dashboard_dates', "", expires=datetime.now() + timedelta(days=30))
+        response.set_cookie('dashboard_titles', "", expires=datetime.now() + timedelta(days=30))
     else:
-        response.set_cookie('dashboard_links', cookie_links)
-        response.set_cookie('dashboard_dates', cookie_dates)
-        response.set_cookie('dashboard_titles', cookie_titles)
+        response.set_cookie('dashboard_links', cookie_links, expires=datetime.now() + timedelta(days=30))
+        response.set_cookie('dashboard_dates', cookie_dates, expires=datetime.now() + timedelta(days=30))
+        response.set_cookie('dashboard_titles', cookie_titles, expires=datetime.now() + timedelta(days=30))
     return response
     # else:
     #     return render_template('index.html', rows=range(session['rows']))
