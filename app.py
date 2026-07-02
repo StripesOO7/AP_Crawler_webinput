@@ -1,10 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from string import ascii_uppercase
 import requests as rq
 from flask import Flask, render_template, request, redirect, url_for, session, make_response
 from bs4 import BeautifulSoup as bs, element
 from os import getenv
 from dotenv import load_dotenv
+from uuid import uuid4
+import psycopg2
 
 load_dotenv()
 
@@ -14,6 +16,78 @@ app.config['SESSION_COOKIE_NAME'] = getenv('SESSION_COOKIE_NAME')
 ### Your secret key as string here. needed for https
 BASE_URL = getenv('BASE_URL') ### YOUR Base ULR/URI without "http(s)://"
 GRAFANA_TOKEN = getenv('GRAFANA_TOKEN') ### generated in your admin settings under "/org/serviceaccounts"
+db_login = {
+    "dbname":getenv('dbname'),
+    "user":getenv('user'),
+    "password":getenv('password'),
+    "host":getenv('host'),
+    "port":getenv('port')
+}
+
+
+def create_tables():
+    db = psycopg2.connect(**db_login)
+    cursor = db.cursor()
+    cursor.execute("""CREATE TABLE IF NOT EXISTS Owners(cookie UUID PRIMARY KEY, user_id BIGSERIAL UNIQUE);""")
+    db.commit()
+    cursor.execute("""CREATE TABLE IF NOT EXISTS Dashboards(owner BIGINT NOT NULL references Owners(user_id), 
+                   dashboard_link TEXT NOT NULL, title TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE NOT NULL);""")
+    db.commit()
+    db.close()
+
+
+def get_dashboards(user_uuid):
+    db = psycopg2.connect(**db_login)
+    cursor = db.cursor()
+    cursor.execute("SELECT dashboard_link, title, created_at FROM Dashboards WHERE owner=(SELECT user_id FROM Owners "
+                   "WHERE cookie = %s LIMIT 1)", (user_uuid,))
+    dashboards_tuple = cursor.fetchall()
+    db.close()
+    return dashboards_tuple
+
+
+def write_dashboard_to_db(user_uuid, link, title, created_at):
+    db = psycopg2.connect(**db_login)
+    cursor = db.cursor()
+    try:
+        cursor.execute("INSERT INTO Dashboards(owner, dashboard_link, title, created_at) "
+                       "SELECT user_id, %s , %s, %s FROM Owners WHERE cookie = %s",
+                       (link, title, created_at, user_uuid))
+        db.commit()
+    except psycopg2.IntegrityError as e:
+        print(f"Error: writing into dashboards table with {link}, {title}, {created_at}, {user_uuid}. \nfull error: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+def delete_dashboard_for_user(user_uuid, link):
+    db = psycopg2.connect(**db_login)
+    cursor = db.cursor()
+    try:
+        cursor.execute("DELETE FROM Dashboards WHERE owner=(SELECT user_id FROM Owners WHERE cookie = %s) and "
+                       "dashboard_link = %s",(user_uuid, link))
+        db.commit()
+    except psycopg2.IntegrityError as e:
+        print(f"Error deleting dashboard from DB with {user_uuid}, {link}. \nfull error: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def create_owner(user_uuid):
+    db = psycopg2.connect(**db_login)
+    cursor = db.cursor()
+    try:
+        cursor.execute("INSERT INTO Owners(cookie) VALUES (%s)", (user_uuid,))
+    except psycopg2.IntegrityError as e:
+        print(f"Error: User with uuid {user_uuid} already exists. \nfull error: {e}")
+        db.rollback()
+    finally:
+        db.commit()
+        db.close()
+        return user_uuid
+
+
 def dashboard_template():
   return {
   "annotations": {
@@ -346,25 +420,27 @@ def delete_dashboard(url:str):
     return redirect(url_for('index'))
 
 
+def get_rows():
+    return max(int(session.get('rows', 1)), 1)
+
+
 @app.route("/webinput/", methods=['GET', 'POST', 'UPDATE'])
 def index():
-    cookie_links = request.cookies.get('dashboard_links') or ""
-    cookie_dates = request.cookies.get('dashboard_dates') or ""
-    cookie_titles = request.cookies.get('dashboard_titles') or ""
+    cookie_user = request.cookies.get('dashboard_user') or create_owner(str(uuid4()))
+
+    dashboards = get_dashboards(cookie_user)
+
     dashboard_link = ""
     added_list = list()
     invalid_links = list()
     title = ""
-    if request.args.get('row_update'):
-        increment = int(request.args.get('increment'))
-        if session['rows'] + increment > 0:
-            session['rows'] = session['rows'] + int(increment)
-            return redirect(url_for('index'))
-        else:
-            return redirect(url_for('index'))
 
-    if not 'rows' in session.keys() or not isinstance(session['rows'], int):
-        session['rows'] = 1
+    session['rows'] = get_rows()
+
+    if request.args.get('row_update'):
+        session['rows'] = max(get_rows() + int(request.args.get('increment', 0)), 1)
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
         create_dashboard = request.form.get('create_dashboard')
         add_links = request.form.get('add_links')
@@ -405,38 +481,18 @@ def index():
                     pass
         if create_dashboard:
             dashboard_link = create_dashboard_template(added_list, title, total_games)
-            if dashboard_link not in cookie_links:
-                cookie_links = ";;".join([*cookie_links.split(";;"), dashboard_link])
-                cookie_dates = ";;".join([*cookie_dates.split(";;"), str(datetime.now())])
-                cookie_titles = ";;".join([*cookie_titles.split(";;"), title])
+            write_dashboard_to_db(cookie_user, dashboard_link, title, datetime.now(timezone.utc))
         if delete_dashboard_link:
             for link in user_input:
                 if f'{BASE_URL}/public-dashboards/' in link:
-                    position_finder = cookie_links.split(";;")
-
-                    remove_cookie_date = cookie_dates.split(";;")
-                    remove_cookie_date.pop(position_finder.index(link))
-                    remove_cookie_title = cookie_titles.split(";;")
-                    remove_cookie_title.pop(position_finder.index(link))
-
-                    cookie_links = cookie_links.replace(f"\073\073{link}", "")
-                    cookie_dates = ";;".join(remove_cookie_date)
-                    cookie_titles = ";;".join(remove_cookie_title)
                     delete_dashboard(link)
-    old_dashboards = cookie_links.split(';;')[1:] or list()
-    creation_dates = cookie_dates.split(';;')[1:] or list()
-    old_dashboard_titles = cookie_titles.split(';;')[1:] or list()
+                    delete_dashboard_for_user(cookie_user, link)
+
     response = make_response(render_template('index.html', rows=range(session['rows']), added_links_list=added_list,
                                              invalid_links_list=invalid_links, dashboard_link=dashboard_link,
-                                             old_dashboards=list(zip(old_dashboards, creation_dates, old_dashboard_titles))))
-    if not cookie_links:
-        response.set_cookie('dashboard_links', "", expires=datetime.now() + timedelta(days=30))
-        response.set_cookie('dashboard_dates', "", expires=datetime.now() + timedelta(days=30))
-        response.set_cookie('dashboard_titles', "", expires=datetime.now() + timedelta(days=30))
-    else:
-        response.set_cookie('dashboard_links', cookie_links, expires=datetime.now() + timedelta(days=30))
-        response.set_cookie('dashboard_dates', cookie_dates, expires=datetime.now() + timedelta(days=30))
-        response.set_cookie('dashboard_titles', cookie_titles, expires=datetime.now() + timedelta(days=30))
+                                             dashboards=get_dashboards(cookie_user)))
+    response.set_cookie('dashboard_user', cookie_user, expires=datetime.now() + timedelta(days=90), samesite="Lax")
+
     return response
     # else:
     #     return render_template('index.html', rows=range(session['rows']))
@@ -449,4 +505,5 @@ def clear():
 
 
 if __name__ == "__main__":
+    create_tables()
     app.run(host='0.0.0.0', debug=False, port=5555)

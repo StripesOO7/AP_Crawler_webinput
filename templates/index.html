@@ -53,7 +53,7 @@
             {% for row in rows %}
             <tr>
                 <td>
-                    <input type="text" name="tracker_urls" id="tracker_link" value="{{ tracker_url }}">
+                    <input type="text" name="tracker_urls" value="">
                 </td>
             </tr>
             {% endfor %}
@@ -118,24 +118,26 @@
 </div>
 {% endif %}
 
-{% if old_dashboards|length > 0 %}
+{% if dashboards|length > 0 %}
 <div class="recently added links">
     <table>
-        <tr>
-            <th>Old Dashboards</th>
-        </tr>
-        <tr>
-            <th>Title</th>
-            <th>Link</th>
-            <th>Created at</th>
-        </tr>
-        {% for dashboard, date, title in old_dashboards %}
-        <tr>
-            <td>{{ title }}</td>
-            <td><a href="{{dashboard}}">{{ dashboard }}</a></td>
-            <td>{{ date }}</td>
-        </tr>
-        {% endfor %}
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Link</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for link, title, created_at in dashboards %}
+            <tr>
+                <td>{{ title }}</td>
+                <td><a href="{{ link }}">{{ link }}</a></td>
+                <td>{{ created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
     </table>
 </div>
 {% endif %}
